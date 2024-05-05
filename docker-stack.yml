@@ -1,0 +1,89 @@
+version: '3.7'
+
+services:
+  ## Postgres
+  postgres-order:
+    image: postgres
+    environment:
+      POSTGRES_DB: order-service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rafting123456
+      PGDATA: /data/postgres
+    volumes:
+      - ./postgres-order:/data/postgres
+    ports:
+      - "5431:5432"
+    networks:
+      - my-overlay
+
+  postgres-inventory:
+    image: postgres
+    environment:
+      POSTGRES_DB: inventory-service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rafting123456
+      PGDATA: /data/postgres
+    volumes:
+      - ./postgres-inventory:/data/postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - my-overlay
+
+  ## Eureka Server
+  discovery-server:
+    image: spring-boot-microservices-discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - my-overlay
+
+  api-gateway:
+    image: spring-boot-microservices-api-gateway
+    ports:
+      - "8181:8080"
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server:8761/eureka
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - discovery-server
+    networks:
+      - my-overlay
+
+  ## Order-Service
+  order-service:
+    image: spring-boot-microservices-order-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-order:5432/order-service
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: rafting123456
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server:8761/eureka
+    depends_on:
+      - postgres-order
+      - discovery-server
+      - api-gateway
+    networks:
+      - my-overlay
+
+  ## Inventory-Service
+  inventory-service:
+    image: spring-boot-microservices-inventory-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-inventory:5432/inventory-service
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: rafting123456
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server:8761/eureka
+    depends_on:
+      - postgres-inventory
+      - discovery-server
+      - api-gateway
+    networks:
+      - my-overlay
+
+networks:
+  my-overlay:
+    driver: overlay
